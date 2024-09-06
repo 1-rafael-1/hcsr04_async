@@ -1,0 +1,17 @@
+[package]
+authors = ["Rafael Koch <rafael.koch@gmx.net>"]
+name = "hcsr04_async"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A no-std driver for the HC-SR04 ultrasonic sensor using async and Embassy"
+categories = ["embedded", "no-std", "hardware-support"]
+keywords = ["async", "embassy", "embedded-hal", "hc-sr04"]
+readme = "README.md"
+repository = "https://github.com/1-rafael-1/hcsr04_async"
+documentation = "https://docs.rs/hcsr04_async"
+
+[dependencies]
+embassy-time = "0.3.2"
+embedded-hal-async = "1.0.0"
+embedded-hal = "1.0.0"

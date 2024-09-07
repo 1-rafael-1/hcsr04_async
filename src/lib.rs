@@ -1,13 +1,13 @@
 //! # hc-sr04-async
-//! 
+//!
 //! This crate provides an asynchronous driver for the HC-SR04 ultrasonic distance sensor.
-//! 
+//!
 //! The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.
 //!
 //! # Note
-//! 
+//!
 //! Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement
-//! get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this 
+//! get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this
 //! driver in a higher priority task.
 
 #![no_std]
@@ -63,23 +63,18 @@ impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
     /// Takes a temperature in units specified in the config.
     fn speed_of_sound_temperature_adjusted(&self, temperature: f64) -> f64 {
         let temp = match self.config.temperature_unit {
-            TemperatureUnit::Celsius => {
-                temperature
-            },
-            TemperatureUnit::Fahrenheit => {
-                (temperature - 32.0) * 5.0 / 9.0
-            }
+            TemperatureUnit::Celsius => temperature,
+            TemperatureUnit::Fahrenheit => (temperature - 32.0) * 5.0 / 9.0,
         };
-        331.5 * sqrt(1.0 + (temp/273.15))
+        331.5 * sqrt(1.0 + (temp / 273.15))
     }
 
     /// Calculate the distance in centimeters based on the speed of sound and the duration of the pulse.
     /// The duration is in seconds and must be divided by 2 to account for the round trip.
     /// Returns the distance in the unit specified in the config.
-    fn distance(&self, speed_of_sound: f64, duration_secs:f64) -> f64 {
+    fn distance(&self, speed_of_sound: f64, duration_secs: f64) -> f64 {
         let distance = (speed_of_sound * 100.0 * duration_secs) / 2.0;
-        match self.config.distance_unit 
-        {
+        match self.config.distance_unit {
             DistanceUnit::Centimeters => distance,
             DistanceUnit::Inches => distance / 2.54,
         }
@@ -123,11 +118,11 @@ impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use embedded_hal::digital::{ErrorType, ErrorKind};
-    use defmt_rtt as _;
     use core::sync::atomic::{AtomicU32, Ordering};
+    use defmt_rtt as _;
+    use embedded_hal::digital::{ErrorKind, ErrorType};
     use libm::round;
-    
+
     // timestamp provider
     static COUNT: AtomicU32 = AtomicU32::new(0);
     defmt::timestamp!("{=u32:us}", COUNT.fetch_add(1, Ordering::Relaxed));
@@ -145,13 +140,13 @@ mod tests {
         unsafe fn release(_state: RawRestoreState) {
             // Implement critical section release
         }
-    }     
+    }
     critical_section::set_impl!(CriticalSection);
 
     struct OutputPinMock;
     impl ErrorType for OutputPinMock {
-            type Error = ErrorKind;
-        }
+        type Error = ErrorKind;
+    }
 
     impl OutputPin for OutputPinMock {
         fn set_high(&mut self) -> Result<(), Self::Error> {
@@ -160,15 +155,18 @@ mod tests {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             Ok(())
         }
-        fn set_state(&mut self, _state: embedded_hal::digital::PinState) -> Result<(),Self::Error> {
-            Ok(())   
+        fn set_state(
+            &mut self,
+            _state: embedded_hal::digital::PinState,
+        ) -> Result<(), Self::Error> {
+            Ok(())
         }
     }
 
     struct InputPinMock;
     impl ErrorType for InputPinMock {
-            type Error = ErrorKind;
-        }
+        type Error = ErrorKind;
+    }
     impl InputPin for InputPinMock {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(true)
@@ -202,7 +200,10 @@ mod tests {
             temperature_unit: TemperatureUnit::Celsius,
         };
         let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
-        assert_eq!(round(sensor.speed_of_sound_temperature_adjusted(0.0)), round(331.5));
+        assert_eq!(
+            round(sensor.speed_of_sound_temperature_adjusted(0.0)),
+            round(331.5)
+        );
     }
 
     #[test]
@@ -212,7 +213,10 @@ mod tests {
             temperature_unit: TemperatureUnit::Celsius,
         };
         let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
-        assert_eq!(round(sensor.speed_of_sound_temperature_adjusted(20.0)), round(343.42));
+        assert_eq!(
+            round(sensor.speed_of_sound_temperature_adjusted(20.0)),
+            round(343.42)
+        );
     }
 
     #[test]
@@ -222,7 +226,10 @@ mod tests {
             temperature_unit: TemperatureUnit::Celsius,
         };
         let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
-        assert_eq!(round(sensor.speed_of_sound_temperature_adjusted(40.0)), round(354.94));
+        assert_eq!(
+            round(sensor.speed_of_sound_temperature_adjusted(40.0)),
+            round(354.94)
+        );
     }
 
     #[test]
@@ -262,7 +269,10 @@ mod tests {
             temperature_unit: TemperatureUnit::Fahrenheit,
         };
         let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
-        assert_eq!(round(sensor.speed_of_sound_temperature_adjusted(32.0)), round(331.5));
+        assert_eq!(
+            round(sensor.speed_of_sound_temperature_adjusted(32.0)),
+            round(331.5)
+        );
     }
 
     #[test]
@@ -282,7 +292,10 @@ mod tests {
             temperature_unit: TemperatureUnit::Fahrenheit,
         };
         let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
-        assert_eq!(round(sensor.speed_of_sound_temperature_adjusted(32.0)), round(331.5));
+        assert_eq!(
+            round(sensor.speed_of_sound_temperature_adjusted(32.0)),
+            round(331.5)
+        );
         assert_eq!(round(sensor.distance(343.14, 0.01)), round(67.56));
     }
 }

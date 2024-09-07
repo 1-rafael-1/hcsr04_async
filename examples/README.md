@@ -4,7 +4,7 @@ Using [Embassy](https://github.com/embassys-rs/embassy) on rp2040
 
 ## Dependencies
 
-#### `probe-run`:
+#### `probe-rs`:
 
 ```console
 $ cargo install probe-rs
@@ -13,5 +13,5 @@ $ cargo install probe-rs
 ## Run!
 
 ```console
-$ cargo run --bin rainbow
+$ cargo run --bin simple_measurement
 ```

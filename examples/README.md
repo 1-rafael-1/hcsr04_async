@@ -14,4 +14,5 @@ $ cargo install probe-rs
 
 ```console
 $ cargo run --bin simple_measurement
+$ cargo run --bin moving_average
 ```

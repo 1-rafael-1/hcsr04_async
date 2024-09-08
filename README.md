@@ -1,6 +1,6 @@
 [![ci](https://github.com/1-rafael-1/hcsr04_async/actions/workflows/rust.yml/badge.svg)](https://github.com/1-rafael-1/hcsr04_async/actions/workflows/rust.yml)
 
-# hc-sr04_async
+# hcsr04_async
 Driver for HC-SR04 ultrasonic distance measuring device for async no-std Rust using Embassy.
 
 The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.

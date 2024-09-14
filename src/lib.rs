@@ -12,7 +12,7 @@
 //! 
 //! # Example
 //! 
-//! ```rust, no_run
+//! ```rust, ignore
 //! #![no_std]
 //! #![no_main]
 //!

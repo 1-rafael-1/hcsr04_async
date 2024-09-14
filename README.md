@@ -15,7 +15,7 @@ Due to the non-blocking nature of this driver there is a probabiity that either 
 
 ## Example
 
-```Rust
+```rust
 #![no_std]
 #![no_main]
 
@@ -59,4 +59,3 @@ async fn main(_spawner: Spawner) {
     }
 }
 ```
-

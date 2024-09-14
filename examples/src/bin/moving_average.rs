@@ -1,4 +1,4 @@
-//! # Simple Measurement
+//! # Simple Measurement with Moving Average Filter
 //! This example demonstrates how to use the HCSR04 sensor to measure distance through a Moving Average Filter.
 //! Such filtering can be useful to reduce the noise in the measurements, especially when the sensor is mounted on a moving platform where the angle and distance to objects can change rapidly.
 //!

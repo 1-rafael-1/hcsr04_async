@@ -1,4 +1,8 @@
 [![ci](https://github.com/1-rafael-1/hcsr04_async/actions/workflows/rust.yml/badge.svg)](https://github.com/1-rafael-1/hcsr04_async/actions/workflows/rust.yml)
+[![Docs](https://docs.rs/hcsr04_async/badge.svg)](https://docs.rs/hcsr04_async/)
+[![Latest version](https://img.shields.io/crates/v/hcsr04_async.svg)](https://crates.io/crates/hcsr04_async)
+![License](https://img.shields.io/crates/l/hcsr04_async.svg)
+
 
 # hcsr04_async
 Driver for HC-SR04 ultrasonic distance measuring device for async no-std Rust using Embassy.

@@ -3,7 +3,13 @@
 //! This crate provides an asynchronous driver for the HC-SR04 ultrasonic distance sensor.
 //!
 //! The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.
-//!
+//! 
+//! ## Features
+//! 
+//! - `blocking_trigger`: (Recommended) This feature enables blocking behavior for the trigger pulse,
+//!   ensuring more accurate timing. It's recommended for most use cases unless you have specific
+//!   reasons to avoid blocking operations even for the 10us of the trigger pulse.
+//! 
 //! # Note
 //!
 //! Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement
@@ -59,7 +65,11 @@
 
 #![no_std]
 
-use embassy_time::{with_timeout, Duration, Instant, Timer};
+#[cfg(feature = "blocking_trigger")]
+use embassy_time::block_for;
+#[cfg(not(feature = "blocking_trigger"))]
+use embassy_time::Timer;
+use embassy_time::{with_timeout, Duration, Instant};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_hal_async::digital::Wait;
 use libm::sqrt;
@@ -138,6 +148,9 @@ impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
 
         // Send a 10us pulse to the trigger pin
         self.trigger.set_high().ok();
+        #[cfg(feature = "blocking_trigger")]
+        block_for(Duration::from_micros(10));
+        #[cfg(not(feature = "blocking_trigger"))]
         Timer::after(Duration::from_micros(10)).await;
         self.trigger.set_low().ok();
 
@@ -346,3 +359,5 @@ mod tests {
         assert_eq!(round(sensor.distance(343.14, 0.01)), round(67.56));
     }
 }
+
+

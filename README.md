@@ -9,6 +9,12 @@ Driver for HC-SR04 ultrasonic distance measuring device for async no-std Rust us
 
 The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.
 
+## Features
+
+- `blocking_trigger`: (Recommended) This feature enables blocking behavior for the trigger pulse, ensuring more accurate timing. It's recommended for most use cases unless you have specific reasons to avoid blocking operations.
+
+Note that this only makes the blocking trigger pulse of 10us blocking, the remainder will still be async.
+
 ## Note
 
 Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this driver in a higher priority task.

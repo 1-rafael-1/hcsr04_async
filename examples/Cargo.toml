@@ -12,7 +12,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 embassy-executor = { version = "0.6.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers", "task-arena-size-32768"] }
 embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-rp = { version = "0.2.0", features = ["defmt", "unstable-pac", "time-driver"] }
-hcsr04_async = { path = "../" }
+hcsr04_async = { path = "../", features = ["blocking_trigger"]}
 moving_median = "0.1.0"
 
 # cargo build/run

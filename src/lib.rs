@@ -3,21 +3,16 @@
 //! This crate provides an asynchronous driver for the HC-SR04 ultrasonic distance sensor.
 //!
 //! The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.
-//! 
-//! ## Features
-//! 
-//! - `blocking_trigger`: (Recommended) This feature enables blocking behavior for the trigger pulse,
-//!   ensuring more accurate timing. It's recommended for most use cases unless you have specific
-//!   reasons to avoid blocking operations even for the 10us of the trigger pulse.
-//! 
-//! # Note
 //!
-//! Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement
-//! get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this
-//! driver in a higher priority task.
-//! 
+//! ## Features
+//!
+//! - `blocking_trigger`: (Default) This feature enables blocking behavior for the trigger pulse,
+//!   ensuring more accurate timing. For 10us async is not very accurate, because it introduces a few microseconds of management. This should normally not affect the sensor,
+//!   many do in fact still trigger if the actual trigger pulse was i.e. 15us. So if you absolutely need the core to do other things while waiting for the trigger pulse,
+//!   you can disable this feature.
+//!
 //! # Example
-//! 
+//!
 //! ```rust, ignore
 //! #![no_std]
 //! #![no_main]
@@ -96,8 +91,7 @@ pub struct Config {
 ///
 /// # Note
 ///
-/// The `measure` method will return an error if the echo pin is already high.
-/// The `measure` method will return an error if the echo pin does not go high or low within 2 seconds each.
+/// The `measure` method will return an error if the echo pin is already high or if the echo pin does not go high or low within 2 seconds each.
 pub struct Hcsr04<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> {
     trigger: TRIGPIN,
     echo: ECHOPIN,
@@ -142,17 +136,29 @@ impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
     /// Returns the distance in the unit specified in the config.
     pub async fn measure(&mut self, temperature: f64) -> Result<f64, &'static str> {
         // error if the echo pin is already high
-        if self.echo.is_high().ok().unwrap() {
-            return Err("Echo pin is already high");
+        match self.echo.is_high() {
+            Ok(true) => return Err("Echo pin is already high"),
+            Ok(false) => (), // all good, continue
+            Err(_) => return Err("Error reading echo pin"),
         }
 
         // Send a 10us pulse to the trigger pin
-        self.trigger.set_high().ok();
+
+        // Set the trigger pin high
+        if let Err(_) = self.trigger.set_high() {
+            return Err("Error setting trigger pin high");
+        }
+
+        // Either block for or wait for 10us, depending on active feature flag
         #[cfg(feature = "blocking_trigger")]
         block_for(Duration::from_micros(10));
         #[cfg(not(feature = "blocking_trigger"))]
         Timer::after(Duration::from_micros(10)).await;
-        self.trigger.set_low().ok();
+
+        // Set the trigger pin low again
+        if let Err(_) = self.trigger.set_low() {
+            return Err("Error setting trigger pin low");
+        }
 
         // Wait for the echo pin to go high with a timeout. If the timeout is reached, return an error.
         let start = match with_timeout(Duration::from_secs(2), self.echo.wait_for_high()).await {
@@ -254,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn speevd_of_sound_m_per_s_temperature_adjusted_0() {
+    fn speed_of_sound_m_per_s_temperature_adjusted_0() {
         let config = Config {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
@@ -359,5 +365,3 @@ mod tests {
         assert_eq!(round(sensor.distance(343.14, 0.01)), round(67.56));
     }
 }
-
-

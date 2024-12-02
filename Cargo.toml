@@ -1,7 +1,7 @@
 [package]
 authors = ["Rafael Koch <rafael.koch@gmx.net>"]
 name = "hcsr04_async"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "A no-std driver for the HC-SR04 ultrasonic sensor using async and Embassy"
@@ -12,11 +12,12 @@ repository = "https://github.com/1-rafael-1/hcsr04_async"
 documentation = "https://docs.rs/hcsr04_async"
 
 [features]
-default = [] # async trigger pulse, default to avoid breaking changes
-blocking_trigger = [] # blocking trigger pulse, recommended for most use cases. Much more accurate trigger pulse length.
+default = ["blocking_trigger"]
+blocking_trigger = [
+] # blocking trigger pulse, recommended for most use cases. Much more accurate trigger pulse length.
 
 [dependencies]
-embassy-time = { version = "0.3.2"}
+embassy-time = { version = "0.3.2" }
 embedded-hal-async = "1.0.0"
 embedded-hal = "1.0.0"
 defmt = "0.3.8"
@@ -28,7 +29,7 @@ embedded-hal = "1.0.0"
 defmt = "0.3.8"
 defmt-rtt = "0.4.1"
 critical-section = "1.1.3"
-embassy-time = { version = "0.3.0"}
+embassy-time = { version = "0.3.0" }
 
 # cargo build/run
 [profile.dev]

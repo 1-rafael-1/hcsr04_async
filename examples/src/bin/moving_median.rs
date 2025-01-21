@@ -18,8 +18,8 @@ use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Level, Output, Pull};
 use embassy_time::{Duration, Timer};
 use hcsr04_async::{Config, DistanceUnit, Hcsr04, TemperatureUnit};
-use {defmt_rtt as _, panic_probe as _};
 use moving_median::MovingMedian;
+use {defmt_rtt as _, panic_probe as _};
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
@@ -35,7 +35,7 @@ async fn main(_spawner: Spawner) {
     };
 
     let mut sensor = Hcsr04::new(trigger, echo, config);
-    let mut moving_median = MovingMedian::<5>::new();
+    let mut moving_median = MovingMedian::<f64, 5>::new();
 
     loop {
         match sensor.measure(22.0).await {

@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    
+    # Main project build and test
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -24,3 +26,9 @@ jobs:
       run: cargo doc --no-deps --document-private-items
     - name: Run documentation tests
       run: cargo test --doc
+
+    # Examples build
+    - name: Build examples
+      run: |
+        cd examples
+        cargo build --verbose

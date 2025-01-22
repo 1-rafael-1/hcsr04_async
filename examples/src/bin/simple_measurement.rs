@@ -15,8 +15,8 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Level, Output, Pull};
-use embassy_time::{Duration, Timer};
-use hcsr04_async::{Config, DistanceUnit, Hcsr04, TemperatureUnit};
+use embassy_time::{Delay, Duration, Instant, Timer};
+use hcsr04_async::{Config, DistanceUnit, Hcsr04, Now, TemperatureUnit};
 use {defmt_rtt as _, panic_probe as _};
 
 #[embassy_executor::main]
@@ -32,7 +32,20 @@ async fn main(_spawner: Spawner) {
         temperature_unit: TemperatureUnit::Celsius,
     };
 
-    let mut sensor = Hcsr04::new(trigger, echo, config);
+    // Create clock function that returns microseconds
+    struct EmbassyClock;
+
+    impl Now for EmbassyClock {
+        fn now_micros(&self) -> u64 {
+            Instant::now().as_micros()
+        }
+    }
+
+    let clock = EmbassyClock;
+
+    let delay = Delay;
+
+    let mut sensor = Hcsr04::new(trigger, echo, config, clock, delay);
 
     // The temperature of the environment, if known, can be used to adjust the speed of sound.
     // If unknown, an average estimate must be used.

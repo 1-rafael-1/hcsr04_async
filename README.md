@@ -15,6 +15,8 @@ The driver is designed to work with Celsius and Fahrenheit temperatures and cent
 
 Note that this only makes the blocking trigger pulse of 10us blocking, the remainder will still be async.
 
+- `embassy`: Initialize the sensor already setup for Embassy.
+
 ## Note
 
 Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this driver in a higher priority task.

@@ -11,6 +11,8 @@
 //!   many do in fact still trigger if the actual trigger pulse was i.e. 15us. So if you absolutely need the core to do other things while waiting for the trigger pulse,
 //!   you can disable this feature.
 //!
+//! - `embassy`: Initialize the sensor already setup for Embassy.
+//!
 //! # Example
 //!
 //! ```rust, ignore
@@ -37,6 +39,21 @@
 //!         temperature_unit: TemperatureUnit::Celsius,
 //!     };
 //!
+//!     // Create clock function that returns microseconds
+//!     struct EmbassyClock;
+//!
+//!     impl Now for EmbassyClock {
+//!         fn now_micros(&self) -> u64 {
+//!             Instant::now().as_micros()
+//!         }
+//!     }
+//!
+//!     let clock = EmbassyClock;
+//!
+//!     let delay = Delay;
+//!
+//!     let mut sensor = Hcsr04::new(trigger, echo, config, clock, delay);
+//!
 //!     let mut sensor = Hcsr04::new(trigger, echo, config);
 //!
 //!     // The temperature of the environment, if known, can be used to adjust the speed of sound.
@@ -60,13 +77,12 @@
 
 #![no_std]
 
-#[cfg(feature = "blocking_trigger")]
-use embassy_time::block_for;
-#[cfg(not(feature = "blocking_trigger"))]
-use embassy_time::Timer;
-use embassy_time::{with_timeout, Duration, Instant};
-use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_hal_async::digital::Wait;
+use embedded_hal::{
+    delay::DelayNs,
+    digital::{InputPin, OutputPin},
+};
+use embedded_hal_async::{delay::DelayNs as DelayNsAsync, digital::Wait};
+use futures::{select_biased, FutureExt};
 use libm::sqrt;
 
 /// The distance unit to use for measurements.
@@ -87,26 +103,49 @@ pub struct Config {
     pub temperature_unit: TemperatureUnit,
 }
 
+pub trait Now {
+    // The time elapsed since startup in microseconds
+    fn now_micros(&self) -> u64;
+}
+
 /// The HC-SR04 ultrasonic distance sensor driver.
 ///
 /// # Note
 ///
 /// The `measure` method will return an error if the echo pin is already high or if the echo pin does not go high or low within 2 seconds each.
-pub struct Hcsr04<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> {
+pub struct Hcsr04<TRIGPIN, ECHOPIN, CLOCK, DELAY> {
     trigger: TRIGPIN,
     echo: ECHOPIN,
     config: Config,
+    clock: CLOCK,
+    delay: DELAY,
 }
 
-impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
+impl<TRIGPIN, ECHOPIN, CLOCK, DELAY> Hcsr04<TRIGPIN, ECHOPIN, CLOCK, DELAY>
+where
+    TRIGPIN: OutputPin,
+    ECHOPIN: InputPin + Wait,
+    CLOCK: Now,
+    DELAY: DelayNs + DelayNsAsync,
+{
     /// Initialize a new sensor.
     /// Requires trigger pin and an echo pin, measurements are taken on the echo pin.
     /// Requires a config.
-    pub fn new(trigger: TRIGPIN, echo: ECHOPIN, config: Config) -> Self {
+    /// Requires a clock that will provide the time in microseconds via the `Now` trait.
+    /// Requires a delay that implements DelayNs, sync and async.
+    pub fn new(
+        trigger: TRIGPIN,
+        echo: ECHOPIN,
+        config: Config,
+        clock: CLOCK,
+        delay: DELAY,
+    ) -> Self {
         Self {
             trigger,
             echo,
             config,
+            clock,
+            delay,
         }
     }
 
@@ -145,35 +184,41 @@ impl<TRIGPIN: OutputPin, ECHOPIN: InputPin + Wait> Hcsr04<TRIGPIN, ECHOPIN> {
         // Send a 10us pulse to the trigger pin
 
         // Set the trigger pin high
-        if let Err(_) = self.trigger.set_high() {
+        if self.trigger.set_high().is_err() {
             return Err("Error setting trigger pin high");
         }
 
         // Either block for or wait for 10us, depending on active feature flag
         #[cfg(feature = "blocking_trigger")]
-        block_for(Duration::from_micros(10));
+        DelayNs::delay_us(&mut self.delay, 10);
         #[cfg(not(feature = "blocking_trigger"))]
-        Timer::after(Duration::from_micros(10)).await;
+        DelayNsAsync::delay_us(&mut self.delay, 10).await;
 
         // Set the trigger pin low again
-        if let Err(_) = self.trigger.set_low() {
+        if self.trigger.set_low().is_err() {
             return Err("Error setting trigger pin low");
         }
 
-        // Wait for the echo pin to go high with a timeout. If the timeout is reached, return an error.
-        let start = match with_timeout(Duration::from_secs(2), self.echo.wait_for_high()).await {
-            Ok(_) => Instant::now(),
-            Err(_) => return Err("Timeout waiting for echo pin to go high"),
+        let start = select_biased! {
+            _ = self.echo.wait_for_high().fuse() => {
+                Now::now_micros(&self.clock)
+            }
+            _ = DelayNsAsync::delay_ms(&mut self.delay, 2000).fuse() => {
+                return Err("Timeout waiting for echo pin to go high");
+            }
         };
 
-        // Wait for the echo pin to go low with a timeout. If the timeout is reached, return an error.
-        let end = match with_timeout(Duration::from_secs(2), self.echo.wait_for_low()).await {
-            Ok(_) => Instant::now(),
-            Err(_) => return Err("Timeout waiting for echo pin to go low"),
+        let end = select_biased! {
+            _ = self.echo.wait_for_low().fuse() => {
+                Now::now_micros(&self.clock)
+            }
+            _ = DelayNsAsync::delay_ms(&mut self.delay, 2000).fuse() => {
+                return Err("Timeout waiting for echo pin to go low");
+            }
         };
 
         // Calculate the distance
-        let pulse_duration_secs = (end - start).as_micros() as f64 / 1_000_000.0;
+        let pulse_duration_secs = (end - start) as f64 / 1_000_000.0;
         Ok(self.distance(
             self.speed_of_sound_temperature_adjusted(temperature),
             pulse_duration_secs,
@@ -200,7 +245,7 @@ mod tests {
 
     unsafe impl critical_section::Impl for CriticalSection {
         unsafe fn acquire() -> RawRestoreState {
-            () // Implement critical section acquire
+            // Implement critical section acquire
         }
 
         unsafe fn release(_state: RawRestoreState) {
@@ -259,13 +304,28 @@ mod tests {
         }
     }
 
+    struct ClockMock;
+    impl Now for ClockMock {
+        fn now_micros(&self) -> u64 {
+            0
+        }
+    }
+
+    struct DelayMock;
+    impl DelayNs for DelayMock {
+        fn delay_ns(&mut self, _ns: u32) {}
+    }
+    impl DelayNsAsync for DelayMock {
+        async fn delay_ns(&mut self, _ns: u32) {}
+    }
+
     #[test]
     fn speed_of_sound_m_per_s_temperature_adjusted_0() {
         let config = Config {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(
             round(sensor.speed_of_sound_temperature_adjusted(0.0)),
             round(331.5)
@@ -278,7 +338,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(
             round(sensor.speed_of_sound_temperature_adjusted(20.0)),
             round(343.42)
@@ -291,7 +351,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(
             round(sensor.speed_of_sound_temperature_adjusted(40.0)),
             round(354.94)
@@ -304,7 +364,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(sensor.distance(343.14, 0.0), 0.0);
     }
 
@@ -314,7 +374,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(sensor.distance(343.14, 0.005), 85.785);
     }
 
@@ -324,7 +384,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(sensor.distance(343.14, 0.01), 171.57);
     }
 
@@ -334,7 +394,7 @@ mod tests {
             distance_unit: DistanceUnit::Centimeters,
             temperature_unit: TemperatureUnit::Fahrenheit,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(
             round(sensor.speed_of_sound_temperature_adjusted(32.0)),
             round(331.5)
@@ -347,7 +407,7 @@ mod tests {
             distance_unit: DistanceUnit::Inches,
             temperature_unit: TemperatureUnit::Celsius,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(round(sensor.distance(343.14, 0.01)), round(67.56));
     }
 
@@ -357,7 +417,7 @@ mod tests {
             distance_unit: DistanceUnit::Inches,
             temperature_unit: TemperatureUnit::Fahrenheit,
         };
-        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config);
+        let sensor = Hcsr04::new(OutputPinMock, InputPinMock, config, ClockMock, DelayMock);
         assert_eq!(
             round(sensor.speed_of_sound_temperature_adjusted(32.0)),
             round(331.5)

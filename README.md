@@ -5,7 +5,7 @@
 
 
 # hcsr04_async
-Driver for HC-SR04 ultrasonic distance measuring device for async no-std Rust using Embassy.
+Driver for HC-SR04 ultrasonic distance measuring device for async no-std Rust.
 
 The driver is designed to work with Celsius and Fahrenheit temperatures and centimeters and inches for distance measurements.
 
@@ -15,11 +15,9 @@ The driver is designed to work with Celsius and Fahrenheit temperatures and cent
 
 Note that this only makes the blocking trigger pulse of 10us blocking, the remainder will still be async.
 
-- `embassy`: Initialize the sensor already setup for Embassy.
-
 ## Note
 
-Due to the non-blocking nature of this driver there is a probabiity that either the trigger pulse or the echo measurement get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this driver in a higher priority task.
+Due to the non-blocking nature of this driver there is a probability that either the trigger pulse or the echo measurement get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this driver in a higher priority task.
 
 ## Example
 
@@ -30,8 +28,8 @@ Due to the non-blocking nature of this driver there is a probabiity that either 
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Level, Output, Pull};
-use embassy_time::{Duration, Timer};
-use hcsr04_async::{Config, DistanceUnit, Hcsr04, TemperatureUnit};
+use embassy_time::{Delay, Duration, Instant, Timer};
+use hcsr04_async::{Config, DistanceUnit, Hcsr04, Now, TemperatureUnit};
 use {defmt_rtt as _, panic_probe as _};
 
 #[embassy_executor::main]
@@ -47,7 +45,19 @@ async fn main(_spawner: Spawner) {
         temperature_unit: TemperatureUnit::Celsius,
     };
 
-    let mut sensor = Hcsr04::new(trigger, echo, config);
+    // Create clock function that returns microseconds
+    struct EmbassyClock;
+
+    impl Now for EmbassyClock {
+        fn now_micros(&self) -> u64 {
+            Instant::now().as_micros()
+        }
+    }
+
+    let clock = EmbassyClock;
+    let delay = Delay;
+
+    let mut sensor = Hcsr04::new(trigger, echo, config, clock, delay);
 
     // The temperature of the environment, if known, can be used to adjust the speed of sound.
     // If unknown, an average estimate must be used.
@@ -66,4 +76,3 @@ async fn main(_spawner: Spawner) {
         Timer::after(Duration::from_secs(1)).await;
     }
 }
-```

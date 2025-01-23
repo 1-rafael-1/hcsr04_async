@@ -11,8 +11,6 @@
 //!   many do in fact still trigger if the actual trigger pulse was i.e. 15us. So if you absolutely need the core to do other things while waiting for the trigger pulse,
 //!   you can disable this feature.
 //!
-//! - `embassy`: Initialize the sensor already setup for Embassy.
-//!
 //! # Example
 //!
 //! ```rust, ignore
@@ -22,8 +20,8 @@
 //! use defmt::*;
 //! use embassy_executor::Spawner;
 //! use embassy_rp::gpio::{Input, Level, Output, Pull};
-//! use embassy_time::{Duration, Timer};
-//! use hcsr04_async::{Config, DistanceUnit, Hcsr04, TemperatureUnit};
+//! use embassy_time::{Delay, Duration, Instant, Timer};
+//! use hcsr04_async::{Config, DistanceUnit, Hcsr04, Now, TemperatureUnit};
 //! use {defmt_rtt as _, panic_probe as _};
 //!
 //! #[embassy_executor::main]
@@ -49,12 +47,9 @@
 //!     }
 //!
 //!     let clock = EmbassyClock;
-//!
 //!     let delay = Delay;
 //!
 //!     let mut sensor = Hcsr04::new(trigger, echo, config, clock, delay);
-//!
-//!     let mut sensor = Hcsr04::new(trigger, echo, config);
 //!
 //!     // The temperature of the environment, if known, can be used to adjust the speed of sound.
 //!     // If unknown, an average estimate must be used.

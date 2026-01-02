@@ -24,6 +24,8 @@ module_name_repetitions = "allow"
 cast_precision_loss = "allow"
 # Allow float comparison in tests (we use rounded values)
 float_cmp = "allow"
+# Allow multiple crate versions (transitive dependencies we can't control)
+multiple_crate_versions = "allow"
 
 [features]
 default = ["blocking_trigger"]

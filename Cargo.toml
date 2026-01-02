@@ -1,8 +1,8 @@
 [package]
 authors = ["Rafael Koch <rafael.koch@gmx.net>"]
 name = "hcsr04_async"
-version = "0.4.0"
-edition = "2021"
+version = "0.5.0"
+edition = "2024"
 license = "MIT"
 description = "A no-std driver for the HC-SR04 ultrasonic sensor using async"
 categories = ["embedded", "no-std", "hardware-support"]
@@ -10,6 +10,22 @@ keywords = ["async", "embedded-hal", "hc-sr04", "ultrasonic", "distance"]
 readme = "README.md"
 repository = "https://github.com/1-rafael-1/hcsr04_async"
 documentation = "https://docs.rs/hcsr04_async"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# Allow some pedantic lints that don't make sense for this use case
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+# Allow precision loss for time calculations (u64 to f64)
+cast_precision_loss = "allow"
+# Allow float comparison in tests (we use rounded values)
+float_cmp = "allow"
+# Allow multiple crate versions (transitive dependencies we can't control)
+multiple_crate_versions = "allow"
 
 [features]
 default = ["blocking_trigger"]
@@ -21,9 +37,6 @@ embedded-hal-async = "^1.0.0"
 embedded-hal = "^1.0.0"
 defmt = "^0.3.8"
 libm = "^0.2.1"
-futures = { version = "0.3.31", default-features = false, features = [
-    "async-await",
-] }
 
 [dev-dependencies]
 embedded-hal-async = "^1.0.0"

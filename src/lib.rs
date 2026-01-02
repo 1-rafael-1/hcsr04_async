@@ -98,7 +98,7 @@ pub struct Config {
 }
 
 pub trait Now {
-    // The time elapsed since startup in microseconds
+    /// The time elapsed since startup in microseconds
     fn now_micros(&self) -> u64;
 }
 
@@ -128,8 +128,8 @@ where
     /// Requires trigger pin and an echo pin, measurements are taken on the echo pin.
     /// Requires a config.
     /// Requires a clock that will provide the time in microseconds via the `Now` trait.
-    /// Requires a delay that implements DelayNs, sync and async.
-    pub fn new(
+    /// Requires a delay that implements `DelayNs`, sync and async.
+    pub const fn new(
         trigger: TRIGPIN,
         echo: ECHOPIN,
         config: Config,

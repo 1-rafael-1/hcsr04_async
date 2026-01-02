@@ -15,6 +15,20 @@ The driver is designed to work with Celsius and Fahrenheit temperatures and cent
 
 Note that this only makes the blocking trigger pulse of 10us blocking, the remainder will still be async.
 
+## Timeout Handling
+
+This driver does not implement timeout handling internally. The `measure()` method will wait indefinitely for the echo pin to respond. If you need timeout handling, wrap the call in your async runtime's timeout mechanism:
+
+```rust
+use embassy_time::{with_timeout, Duration};
+
+match with_timeout(Duration::from_secs(2), sensor.measure(temperature)).await {
+    Ok(Ok(distance)) => info!("Distance: {} cm", distance),
+    Ok(Err(e)) => info!("Measurement error: {:?}", e),
+    Err(_) => info!("Timeout"),
+}
+```
+
 ## Note
 
 Due to the non-blocking nature of this driver there is a probability that either the trigger pulse or the echo measurement get impacted by other async tasks. If this becomes a problem You must either use a blocking driver or You can attempt to run this driver in a higher priority task.

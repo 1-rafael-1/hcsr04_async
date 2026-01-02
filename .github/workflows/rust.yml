@@ -2,33 +2,34 @@ name: ci
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    
-    # Main project build and test
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Build documentation
-      run: cargo doc --no-deps --document-private-items
-    - name: Run documentation tests
-      run: cargo test --doc
+      - uses: actions/checkout@v4
 
-    # Examples build
-    - name: Build examples
-      run: |
-        cd examples
-        cargo build --verbose
+      # Main project build and test
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Build documentation
+        run: cargo doc --no-deps --document-private-items
+      - name: Run documentation tests
+        run: cargo test --doc
+
+      # Examples build
+      - name: Build examples
+        run: |
+          cd examples
+          cargo build --verbose

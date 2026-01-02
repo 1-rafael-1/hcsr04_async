@@ -77,7 +77,6 @@ use embedded_hal::{
     digital::{InputPin, OutputPin},
 };
 use embedded_hal_async::{delay::DelayNs as DelayNsAsync, digital::Wait};
-use futures::{select_biased, FutureExt};
 use libm::sqrt;
 
 /// The distance unit to use for measurements.
@@ -107,7 +106,9 @@ pub trait Now {
 ///
 /// # Note
 ///
-/// The `measure` method will return an error if the echo pin is already high or if the echo pin does not go high or low within 2 seconds each.
+/// The `measure` method will return an error if the echo pin is already high.
+/// The method will wait indefinitely for the echo pin to respond. If you need timeout
+/// handling, wrap the call in your async runtime's timeout mechanism (e.g., `embassy_time::with_timeout`).
 pub struct Hcsr04<TRIGPIN, ECHOPIN, CLOCK, DELAY> {
     trigger: TRIGPIN,
     echo: ECHOPIN,
@@ -168,20 +169,33 @@ where
     /// Measure the distance in the unit specified in the config.
     /// Takes a temperature in units specified in the config.
     /// Returns the distance in the unit specified in the config.
+    ///
+    /// # Note
+    ///
+    /// This method does not implement timeout handling. It will wait indefinitely for the
+    /// echo pin to respond. If you need timeout handling, wrap the call in your async
+    /// runtime's timeout mechanism.
+    ///
+    /// Example with embassy-time:
+    /// ```ignore
+    /// use embassy_time::{with_timeout, Duration};
+    ///
+    /// match with_timeout(Duration::from_secs(2), sensor.measure(temperature)).await {
+    ///     Ok(Ok(distance)) => info!("Distance: {} cm", distance),
+    ///     Ok(Err(e)) => info!("Measurement error: {:?}", e),
+    ///     Err(_) => info!("Timeout"),
+    /// }
+    /// ```
     pub async fn measure(&mut self, temperature: f64) -> Result<f64, &'static str> {
-        // error if the echo pin is already high
-        match self.echo.is_high() {
-            Ok(true) => return Err("Echo pin is already high"),
-            Ok(false) => (), // all good, continue
-            Err(_) => return Err("Error reading echo pin"),
+        // Error if the echo pin is already high
+        if self.echo.is_high().map_err(|_| "Error reading echo pin")? {
+            return Err("Echo pin is already high");
         }
 
         // Send a 10us pulse to the trigger pin
-
-        // Set the trigger pin high
-        if self.trigger.set_high().is_err() {
-            return Err("Error setting trigger pin high");
-        }
+        self.trigger
+            .set_high()
+            .map_err(|_| "Error setting trigger pin high")?;
 
         // Either block for or wait for 10us, depending on active feature flag
         #[cfg(feature = "blocking_trigger")]
@@ -190,27 +204,23 @@ where
         DelayNsAsync::delay_us(&mut self.delay, 10).await;
 
         // Set the trigger pin low again
-        if self.trigger.set_low().is_err() {
-            return Err("Error setting trigger pin low");
-        }
+        self.trigger
+            .set_low()
+            .map_err(|_| "Error setting trigger pin low")?;
 
-        let start = select_biased! {
-            _ = self.echo.wait_for_high().fuse() => {
-                Now::now_micros(&self.clock)
-            }
-            _ = DelayNsAsync::delay_ms(&mut self.delay, 2000).fuse() => {
-                return Err("Timeout waiting for echo pin to go high");
-            }
-        };
+        // Wait for echo pulse to start
+        self.echo
+            .wait_for_high()
+            .await
+            .map_err(|_| "Error waiting for echo high")?;
+        let start = Now::now_micros(&self.clock);
 
-        let end = select_biased! {
-            _ = self.echo.wait_for_low().fuse() => {
-                Now::now_micros(&self.clock)
-            }
-            _ = DelayNsAsync::delay_ms(&mut self.delay, 2000).fuse() => {
-                return Err("Timeout waiting for echo pin to go low");
-            }
-        };
+        // Wait for echo pulse to end
+        self.echo
+            .wait_for_low()
+            .await
+            .map_err(|_| "Error waiting for echo low")?;
+        let end = Now::now_micros(&self.clock);
 
         // Calculate the distance
         let pulse_duration_secs = (end - start) as f64 / 1_000_000.0;
